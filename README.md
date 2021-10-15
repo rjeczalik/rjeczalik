@@ -1,16 +1,15 @@
 ### Hi there 👋
 
-<!--
-**rjeczalik/rjeczalik** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
+I'm building ☁️ [Scylla Cloud](https://cloud.scylladb.com) at [@scylladb](https://github.com/scylladb) ✨.
 
-Here are some ideas to get you started:
+I happen to built some DevOps tools that can help with your [Scylla](https://github.com/scylladb/scylla) cluster, like:
 
-- 🔭 I’m currently working on ...
-- 🌱 I’m currently learning ...
-- 👯 I’m looking to collaborate on ...
-- 🤔 I’m looking for help with ...
-- 💬 Ask me about ...
-- 📫 How to reach me: ...
-- 😄 Pronouns: ...
-- ⚡ Fun fact: ...
--->
+👉 https://github.com/rjeczalik/terraform-aws-scylla
+
+👉 https://github.com/rjeczalik/terraform-aws-scylla-bench
+
+👉 https://github.com/scylladb/scylla-bot
+
+I the near future I plan to blog about unique challenges I had solved during 10+ years of my Cloud Engineering journey.
+
+Keep an eye on 🌐 https://rafal.dev and stay tuned! 🦄
