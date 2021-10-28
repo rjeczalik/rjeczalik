@@ -1,0 +1,44 @@
+{
+    "version": "https://jsonfeed.org/version/1",
+    "title": "Rafal",
+    "home_page_url": "http://localhost:4000/",
+    "feed_url": "http://localhost:4000/feed.json",
+    "description": "Rafal writes about geeky things. 🦄 ✨",
+    "icon": "http://localhost:4000/apple-touch-icon.png",
+    "favicon": "http://localhost:4000/favicon.ico",
+    "expired": false,
+    
+    "author":  {
+        "name": "Rafal Jeczalik",
+        "url": "https://blog.rafal.dev",
+        "avatar": null
+    },
+    
+"items": [
+    
+        {
+            "id": "http://localhost:4000/2021/10/28/hello-world",
+            "title": "Hello World!",
+            "summary": "Hello World!",
+            "content_text": "Hello World!",
+            "content_html": "<p>Hello World!</p>",
+            "url": "http://localhost:4000/2021/10/28/hello-world",
+            
+            
+            
+            
+            
+            "date_published": "2021-10-28T00:00:00+02:00",
+            "date_modified": "2021-10-28T00:00:00+02:00",
+            
+                "author":  {
+                "name": "Rafal Jeczalik",
+                "url": "https://blog.rafal.dev",
+                "avatar": null
+                }
+                
+            
+        }
+    
+    ]
+}
