@@ -1,5 +1,5 @@
 site: rafal.dev
-url: https://blog.rafal.dev
+url: https://rafal.dev
 title: Rafal
 description: Writing about geeky stuff 🦄 ✨
 twitter:
@@ -10,7 +10,7 @@ author:
   name: Rafal Jeczalik
   avatar:
   email: hi@rafal.dev
-  url: https://blog.rafal.dev
+  url: https://rafal.dev
 permalink: pretty
 
 baseurl: ""

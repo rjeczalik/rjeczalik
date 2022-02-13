@@ -1,2 +1,2 @@
 User-agent: *
-Sitemap: https://blog.rafal.dev/sitemap.xml
+Sitemap: https://rafal.dev/sitemap.xml

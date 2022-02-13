@@ -1,28 +1,28 @@
 {
     "version": "https://jsonfeed.org/version/1",
     "title": "Rafal",
-    "home_page_url": "https://blog.rafal.dev/",
-    "feed_url": "https://blog.rafal.dev/feed.json",
+    "home_page_url": "https://rafal.dev/",
+    "feed_url": "https://rafal.dev/feed.json",
     "description": "Writing about geeky stuff 🦄 ✨",
-    "icon": "https://blog.rafal.dev/apple-touch-icon.png",
-    "favicon": "https://blog.rafal.dev/favicon.ico",
+    "icon": "https://rafal.dev/apple-touch-icon.png",
+    "favicon": "https://rafal.dev/favicon.ico",
     "expired": false,
     
     "author":  {
         "name": "Rafal Jeczalik",
-        "url": "https://blog.rafal.dev",
+        "url": "https://rafal.dev",
         "avatar": null
     },
     
 "items": [
     
         {
-            "id": "https://blog.rafal.dev/2021/10/28/hello-world",
+            "id": "https://rafal.dev/2021/10/28/hello-world",
             "title": "Hello World!",
             "summary": "Hello World!",
             "content_text": "Hello World!",
             "content_html": "<p>Hello World!</p>",
-            "url": "https://blog.rafal.dev/2021/10/28/hello-world",
+            "url": "https://rafal.dev/2021/10/28/hello-world",
             
             
             
@@ -33,7 +33,7 @@
             
                 "author":  {
                 "name": "Rafal Jeczalik",
-                "url": "https://blog.rafal.dev",
+                "url": "https://rafal.dev",
                 "avatar": null
                 }
                 
