@@ -38,10 +38,13 @@ plugins:
 collections:
   pages:
     output: true
-    permalink: /:name
+    permalink: /page/:name
   posts:
     output: true
     permalink: /:year/:month/:day/:slug
+  go-imports:
+    output: true
+    permalink: /:name
 
 defaults:
   - scope:
@@ -59,8 +62,8 @@ defaults:
     values:
       layout: "post"
   - scope:
-      path: "go-imports"
+      path: ""
+      type: "go-imports"
     values:
-      layout: go-imports
-      permalink: /:basename
-      branch: main
+      layout: "go-import"
+      branch: "main"
