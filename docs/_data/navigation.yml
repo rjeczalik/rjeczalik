@@ -2,8 +2,8 @@ links:
 - title: Posts
   url: /
 - title: About
-  url: /about
+  url: /page/about
 - title: Search
-  url: /search
+  url: /page/search
 - title: Rss
-  url: /atom.xml
+  url: /page/atom.xml
