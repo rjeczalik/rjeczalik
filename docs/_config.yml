@@ -13,7 +13,9 @@ author:
   url: https://blog.rafal.dev
 permalink: pretty
 
-baseurl: ""
+baseurl: blog.rafal.dev
+domain: rafal.dev
+github_username: rjeczalik
 
 highlighter: none
 
@@ -42,20 +44,23 @@ collections:
     permalink: /:year/:month/:day/:slug
 
 defaults:
-  -
-    scope:
+  - scope:
       path: ""
     values:
       layout: "default"
-  -
-    scope:
+  - scope:
       path: ""
       type: "pages"
     values:
       layout: "page"
-  -
-    scope:
+  - scope:
       path: ""
       type: "posts"
     values:
       layout: "post"
+  - scope:
+      path: "go-imports"
+    values:
+      layout: go-imports
+      permalink: /:basename
+      branch: main

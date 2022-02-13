@@ -1,0 +1,3 @@
+---
+repo: dns2mycnf
+---

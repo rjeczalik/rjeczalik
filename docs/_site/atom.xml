@@ -2,9 +2,9 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 
  <title>Rafal</title>
- <link href="https://blog.rafal.dev/atom.xml" rel="self"/>
- <link href="https://blog.rafal.dev/"/>
- <updated>2022-02-13T21:34:34+01:00</updated>
+ <link href="https://blog.rafal.devblog.rafal.dev/atom.xml" rel="self"/>
+ <link href="https://blog.rafal.devblog.rafal.dev/"/>
+ <updated>2022-02-13T21:49:58+01:00</updated>
  <id>https://blog.rafal.dev</id>
  <author>
    <name>Rafal Jeczalik</name>
@@ -14,7 +14,7 @@
  
  <entry>
    <title>Hello World!</title>
-   <link href="https://blog.rafal.dev/2021/10/28/hello-world"/>
+   <link href="https://blog.rafal.devblog.rafal.dev/2021/10/28/hello-world"/>
    <updated>2021-10-28T00:00:00+02:00</updated>
    <id>https://blog.rafal.dev/2021/10/28/hello-world</id>
    <content type="html">&lt;p&gt;Hello World!&lt;/p&gt;
