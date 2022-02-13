@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd" xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 <url>
-<loc>https://blog.rafal.dev/blog.rafal.dev/about</loc>
-<lastmod>2022-02-13T21:49:58+01:00</lastmod>
+<loc>https://blog.rafal.dev/about</loc>
+<lastmod>2022-02-13T21:54:18+01:00</lastmod>
 </url>
 <url>
-<loc>https://blog.rafal.dev/blog.rafal.dev/search</loc>
-<lastmod>2022-02-13T21:49:58+01:00</lastmod>
+<loc>https://blog.rafal.dev/search</loc>
+<lastmod>2022-02-13T21:54:18+01:00</lastmod>
 </url>
 <url>
-<loc>https://blog.rafal.dev/blog.rafal.dev/2021/10/28/hello-world</loc>
+<loc>https://blog.rafal.dev/2021/10/28/hello-world</loc>
 <lastmod>2021-10-28T00:00:00+02:00</lastmod>
 </url>
 <url>
-<loc>https://blog.rafal.dev/blog.rafal.dev/dns2mycnf</loc>
+<loc>https://blog.rafal.dev/dns2mycnf</loc>
 </url>
 <url>
-<loc>https://blog.rafal.dev/blog.rafal.dev/</loc>
+<loc>https://blog.rafal.dev/</loc>
 </url>
 </urlset>

@@ -13,7 +13,7 @@ author:
   url: https://blog.rafal.dev
 permalink: pretty
 
-baseurl: blog.rafal.dev
+baseurl: ""
 domain: rafal.dev
 github_username: rjeczalik
 
