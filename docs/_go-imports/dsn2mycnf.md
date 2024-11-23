@@ -1,3 +1,0 @@
----
-repo: dsn2mycnf
----

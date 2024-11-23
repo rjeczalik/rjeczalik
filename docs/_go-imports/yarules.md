@@ -1,4 +1,0 @@
----
-repo: yarules
-package: rules
----
