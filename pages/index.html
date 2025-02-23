@@ -397,8 +397,8 @@
             }
         }
 
-        const MAX_PARTICLES = 50000;
-        const CELL_SIZE = 20;
+        const MAX_PARTICLES = 100000;
+        const CELL_SIZE = 15;
         const spatialGrid = new SpatialGrid(canvas.width, canvas.height, CELL_SIZE);
         let particles = [];
 
@@ -406,9 +406,10 @@
         const COLORS = {
             background: '#2a2a2a',
             particles: {
-                base: '#8a8a8a',
-                bright: '#c0c0c0',
-                glow: '#ffffff'
+                base: '#d4c5a3',    // Sandy base color
+                bright: '#e6dcc3',   // Bright sand
+                dim: '#b5a88e',      // Darker sand
+                glow: '#fff9e6'      // Sand highlight
             },
             player: {
                 local: '#4a9eff',
@@ -419,15 +420,15 @@
 
         function initParticles() {
             particles = [];
-            const numParticles = Math.min(MAX_PARTICLES, Math.floor((canvas.width * canvas.height) / 300));
+            const numParticles = Math.min(MAX_PARTICLES, Math.floor((canvas.width * canvas.height) / 150));
             const gridSize = Math.sqrt(numParticles);
             const spacingX = canvas.width / gridSize;
             const spacingY = canvas.height / gridSize;
             
             for (let i = 0; i < gridSize; i++) {
                 for (let j = 0; j < gridSize; j++) {
-                    const x = (j + Math.random() * 0.8) * spacingX;
-                    const y = (i + Math.random() * 0.8) * spacingY;
+                    const x = (j + Math.random() * 0.9) * spacingX;
+                    const y = (i + Math.random() * 0.9) * spacingY;
                     particles.push(new Particle(x, y));
                 }
             }
@@ -442,45 +443,44 @@
                 this.ax = 0;
                 this.ay = 0;
                 this.isConsumed = false;
-                this.brightness = Math.random() * 0.4 + 0.6;
-                this.mass = Math.random() * 0.5 + 0.5;
-                this.friction = 0.98;
-                this.maxSpeed = 2;
-                this.baseColor = COLORS.particles.base;
-                this.brightColor = COLORS.particles.bright;
+                this.brightness = Math.random() * 0.3 + 0.7; // Higher base brightness
+                this.mass = Math.random() * 0.3 + 0.7; // More consistent mass
+                this.friction = 0.95; // More friction for sand-like behavior
+                this.maxSpeed = 1.5; // Slower max speed
+                this.size = Math.random() * 0.3 + 0.8; // Smaller, more consistent size
+                
+                // Randomly select color variation
+                const colorRoll = Math.random();
+                if (colorRoll < 0.6) {
+                    this.baseColor = COLORS.particles.base;
+                } else if (colorRoll < 0.8) {
+                    this.baseColor = COLORS.particles.bright;
+                } else {
+                    this.baseColor = COLORS.particles.dim;
+                }
                 this.glowColor = COLORS.particles.glow;
-                this.size = Math.random() * 0.8 + 1.2;
             }
 
             draw() {
                 if (this.isConsumed) return;
                 
                 const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-                const alpha = this.brightness * (0.6 + speed * 0.4);
-                const size = this.size + speed * 0.4;
+                const alpha = this.brightness * (0.7 + speed * 0.3); // Higher base alpha
+                const size = this.size + speed * 0.2; // Less size variation with speed
                 
-                // Enhanced glow for better visibility
+                // Minimal glow for moving particles
                 if (speed > 0.5) {
                     ctx.beginPath();
-                    ctx.arc(this.x, this.y, size * 2, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.08})`;
+                    ctx.arc(this.x, this.y, size * 1.3, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(${this.glowColor}, ${alpha * 0.05})`;
                     ctx.fill();
                 }
 
-                // Draw base particle with stronger color
+                // Draw base particle
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
-                const color = speed > 0.8 ? this.brightColor : this.baseColor;
-                ctx.fillStyle = `rgba(${color}, ${alpha})`;
+                ctx.fillStyle = `rgba(${this.baseColor}, ${alpha})`;
                 ctx.fill();
-
-                // Add highlight for extra visibility
-                if (speed > 0.3) {
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, size * 0.4, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(${this.glowColor}, ${alpha * 0.3})`;
-                    ctx.fill();
-                }
             }
 
             update() {
@@ -492,7 +492,7 @@
                 let totalForceY = 0;
 
                 // Use spatial grid for player detection
-                const nearbyPlayers = spatialGrid.getNearby(this.x, this.y, 100);
+                const nearbyPlayers = spatialGrid.getNearby(this.x, this.y, 150);
                 nearbyPlayers.forEach(player => {
                     const dx = player.x - this.x;
                     const dy = player.y - this.y;
@@ -503,26 +503,76 @@
                         closestPlayer = player;
                     }
 
-                    if (distance < player.repelRadius()) {
-                        const force = (player.repelRadius() - distance) / player.repelRadius();
+                    // Create attractive force field
+                    const attractionRadius = player.size * 5;
+                    const repelRadius = player.size * 1.2;
+                    
+                    if (distance < attractionRadius) {
+                        let force;
+                        if (distance < repelRadius) {
+                            // Repel when too close
+                            force = -1.5 * (repelRadius - distance) / repelRadius;
+                        } else {
+                            // Attract within the field
+                            force = 0.8 * (1 - distance / attractionRadius);
+                            
+                            // Add circular motion
+                            const angle = Math.atan2(dy, dx);
+                            const tangentialForce = 0.4 * force;
+                            totalForceX += -Math.sin(angle) * tangentialForce * (player.isMoving ? 2 : 1);
+                            totalForceY += Math.cos(angle) * tangentialForce * (player.isMoving ? 2 : 1);
+                        }
+                        
+                        // Apply radial force
                         const angle = Math.atan2(dy, dx);
                         totalForceX += Math.cos(angle) * force * (player.isMoving ? 2 : 1);
                         totalForceY += Math.sin(angle) * force * (player.isMoving ? 2 : 1);
                     }
                 });
 
-                if (!closestPlayer) return;
+                // Particle-particle interaction for fluid behavior
+                const nearbyParticles = spatialGrid.getNearby(this.x, this.y, 20);
+                nearbyParticles.forEach(particle => {
+                    if (particle === this || particle.isConsumed) return;
+                    
+                    const dx = particle.x - this.x;
+                    const dy = particle.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 15) {
+                        // Cohesion and separation
+                        const force = distance < 5 ? -0.2 : 0.05;
+                        const angle = Math.atan2(dy, dx);
+                        totalForceX += Math.cos(angle) * force;
+                        totalForceY += Math.sin(angle) * force;
+                        
+                        // Velocity matching
+                        totalForceX += (particle.vx - this.vx) * 0.02;
+                        totalForceY += (particle.vy - this.vy) * 0.02;
+                    }
+                });
 
-                if (minDistance < closestPlayer.consumeRadius() && closestPlayer.canConsume && closestPlayer.isMoving) {
+                if (closestPlayer && minDistance < closestPlayer.consumeRadius() && closestPlayer.canConsume && closestPlayer.isMoving) {
                     this.isConsumed = true;
                     closestPlayer.consumed++;
                     closestPlayer.size = closestPlayer.baseSize + Math.sqrt(closestPlayer.consumed) * 0.5;
                     return;
                 }
 
-                // Apply forces with improved physics
-                this.ax = -totalForceX * 0.15;
-                this.ay = -totalForceY * 0.15;
+                // Apply forces with improved fluid physics
+                const forceMagnitude = Math.sqrt(totalForceX * totalForceX + totalForceY * totalForceY);
+                if (forceMagnitude > 2) {
+                    const scale = 2 / forceMagnitude;
+                    totalForceX *= scale;
+                    totalForceY *= scale;
+                }
+
+                this.ax = totalForceX * 0.2;
+                this.ay = totalForceY * 0.2;
+
+                // Add slight random movement for more natural flow
+                this.ax += (Math.random() - 0.5) * 0.01;
+                this.ay += (Math.random() - 0.5) * 0.01;
 
                 this.vx += this.ax;
                 this.vy += this.ay;
@@ -539,25 +589,25 @@
                 this.x += this.vx;
                 this.y += this.vy;
 
-                // Improved boundary behavior
+                // Improved boundary behavior with dampening
                 if (this.x < 0) { 
                     this.x = 0; 
-                    this.vx *= -0.8; 
-                    this.ax = Math.abs(this.ax) * 0.5;
+                    this.vx *= -0.5; 
+                    this.ax *= -0.5;
                 } else if (this.x > canvas.width) { 
                     this.x = canvas.width; 
-                    this.vx *= -0.8;
-                    this.ax = -Math.abs(this.ax) * 0.5;
+                    this.vx *= -0.5;
+                    this.ax *= -0.5;
                 }
                 
                 if (this.y < 0) { 
                     this.y = 0; 
-                    this.vy *= -0.8;
-                    this.ay = Math.abs(this.ay) * 0.5;
+                    this.vy *= -0.5;
+                    this.ay *= -0.5;
                 } else if (this.y > canvas.height) { 
                     this.y = canvas.height; 
-                    this.vy *= -0.8;
-                    this.ay = -Math.abs(this.ay) * 0.5;
+                    this.vy *= -0.5;
+                    this.ay *= -0.5;
                 }
             }
         }
