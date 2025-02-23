@@ -1,37 +1,104 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sand Eater</title>
+    <title>Sand Eating Game - Multiplayer</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            background-color: #2a2a2a;
+            background: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
         }
         canvas {
-            display: block;
+            flex-grow: 1;
+        }
+        .top-bar {
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            font-family: monospace;
+            font-size: 20px;
+            color: #f0f0f0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            pointer-events: none;
+            justify-content: space-between;
+        }
+        .room-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background: rgba(32, 32, 32, 0.4);
+            padding: 5px 10px;
+            border-radius: 4px;
+            pointer-events: auto;
+        }
+        .score-display {
+            background: rgba(32, 32, 32, 0.4);
+            padding: 5px 15px;
+            border-radius: 4px;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        input, button {
+            background: #000;
+            border: 1px solid #f0f0f0;
+            color: #f0f0f0;
+            padding: 5px 10px;
+            font-family: monospace;
+            font-size: 20px;
+            pointer-events: auto;
+        }
+        button:hover {
+            background: #f0f0f0;
+            color: #000;
         }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
+    <div class="top-bar">
+        <div class="room-controls">
+            <span>room:</span>
+            <input type="text" id="room-input" size="8">
+            <button id="join-button">Join</button>
+        </div>
+        <div class="score-display" id="score-display">score: 0</div>
+        <div style="width: 200px"></div>
+    </div>
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        
-        // Set canvas size to window size
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
-        // Game state
-        const player = {
+        const networkState = {
+            peer: null,
+            connections: new Map(),
+            isHost: false,
+            roomId: null,
+            playerId: Math.random().toString(36).substr(2, 9),
+            eventQueue: [],
+            lastBroadcast: 0,
+            broadcastInterval: 50,
+            debug: localStorage.debug === "1"
+        };
+
+        function debugLog(...args) {
+            if (networkState.debug) {
+                console.log(`[${new Date().toISOString()}] [P2P]`, ...args);
+            }
+        }
+
+        const players = new Map();
+        const localPlayer = {
+            id: networkState.playerId,
             x: canvas.width / 2,
             y: canvas.height / 2,
             size: 6,
@@ -46,16 +113,138 @@
             lastX: canvas.width / 2,
             lastY: canvas.height / 2,
             consumeRadius: function() {
-                // Consumption radius gets relatively smaller as player grows
                 return this.size * 0.3;
             },
             repelRadius: function() {
-                // Larger repel radius for more visible fluid animations
                 return this.size * 4;
             }
         };
+        players.set(localPlayer.id, localPlayer);
 
-        // Sand grain particle class
+        function initNetworking() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomId = urlParams.get('room');
+            
+            networkState.peer = new Peer(networkState.playerId);
+            
+            networkState.peer.on('open', id => {
+                debugLog('PeerJS connection opened', { id });
+            });
+
+            networkState.peer.on('error', err => {
+                debugLog('PeerJS error', { error: err.type });
+            });
+            
+            if (roomId) {
+                networkState.roomId = roomId;
+                networkState.isHost = false;
+                document.getElementById('room-input').value = roomId;
+                connectToPeer(roomId);
+                debugLog('Joining room', { roomId });
+            } else {
+                networkState.roomId = networkState.playerId;
+                networkState.isHost = true;
+                document.getElementById('room-input').value = networkState.roomId;
+                window.history.pushState({}, '', `?room=${networkState.roomId}`);
+                debugLog('Created new room', { roomId: networkState.roomId });
+            }
+
+            networkState.peer.on('connection', handleConnection);
+        }
+
+        function connectToPeer(peerId) {
+            debugLog('Initiating connection to peer', { peerId });
+            const conn = networkState.peer.connect(peerId);
+            handleConnection(conn);
+        }
+
+        function handleConnection(conn) {
+            debugLog('New connection established', { peer: conn.peer });
+
+            conn.on('open', () => {
+                networkState.connections.set(conn.peer, conn);
+                const state = {
+                    type: 'state',
+                    players: Array.from(players.values()).map(p => ({
+                        id: p.id,
+                        x: p.x,
+                        y: p.y,
+                        size: p.size,
+                        consumed: p.consumed
+                    }))
+                };
+                conn.send(state);
+                debugLog('Sent initial state to peer', { peer: conn.peer, state });
+            });
+
+            conn.on('data', data => {
+                debugLog('Received data from peer', { peer: conn.peer, data });
+                handleNetworkMessage(data);
+            });
+
+            conn.on('close', () => {
+                debugLog('Peer disconnected', { peer: conn.peer });
+                networkState.connections.delete(conn.peer);
+                players.delete(conn.peer);
+            });
+
+            conn.on('error', err => {
+                debugLog('Connection error', { peer: conn.peer, error: err.type });
+            });
+        }
+
+        function handleNetworkMessage(data) {
+            switch (data.type) {
+                case 'state':
+                    debugLog('Processing state update', { players: data.players.length });
+                    data.players.forEach(p => {
+                        if (p.id !== localPlayer.id) {
+                            if (!players.has(p.id)) {
+                                players.set(p.id, {
+                                    ...localPlayer,
+                                    id: p.id
+                                });
+                                debugLog('New player joined', { playerId: p.id });
+                            }
+                            const player = players.get(p.id);
+                            Object.assign(player, p);
+                        }
+                    });
+                    break;
+                case 'update':
+                    if (data.playerId !== localPlayer.id) {
+                        debugLog('Processing player update', { playerId: data.playerId });
+                        const player = players.get(data.playerId);
+                        if (player) {
+                            Object.assign(player, data.state);
+                        }
+                    }
+                    break;
+            }
+        }
+
+        function broadcastState() {
+            const now = Date.now();
+            if (now - networkState.lastBroadcast >= networkState.broadcastInterval) {
+                const state = {
+                    type: 'update',
+                    playerId: localPlayer.id,
+                    state: {
+                        x: localPlayer.x,
+                        y: localPlayer.y,
+                        size: localPlayer.size,
+                        consumed: localPlayer.consumed
+                    }
+                };
+                
+                networkState.connections.forEach(conn => {
+                    conn.send(state);
+                    debugLog('Broadcasting state', { peer: conn.peer, state });
+                });
+                networkState.lastBroadcast = now;
+            }
+        }
+
         class Particle {
             constructor(x, y) {
                 this.x = x;
@@ -77,23 +266,35 @@
             update() {
                 if (this.isConsumed) return;
 
-                const dx = player.x - this.x;
-                const dy = player.y - this.y;
+                let closestPlayer = null;
+                let minDistance = Infinity;
+                
+                players.forEach(player => {
+                    const dx = player.x - this.x;
+                    const dy = player.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestPlayer = player;
+                    }
+                });
+
+                if (!closestPlayer) return;
+
+                const dx = closestPlayer.x - this.x;
+                const dy = closestPlayer.y - this.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
-                // Check if particle can be consumed - only if player is moving
-                if (distance < player.consumeRadius() && player.canConsume && player.isMoving) {
+                if (distance < closestPlayer.consumeRadius() && closestPlayer.canConsume && closestPlayer.isMoving) {
                     this.isConsumed = true;
-                    player.consumed++;
-                    // Grow by 10% every 100 particles
-                    player.size = player.baseSize * (1 + Math.floor(player.consumed / 100) * 0.1);
-                    player.canConsume = false;
-                    setTimeout(() => { player.canConsume = true; }, player.consumeCooldown);
+                    closestPlayer.consumed++;
+                    closestPlayer.size = closestPlayer.baseSize * (1 + Math.floor(closestPlayer.consumed / 100) * 0.1);
+                    closestPlayer.canConsume = false;
+                    setTimeout(() => { closestPlayer.canConsume = true; }, closestPlayer.consumeCooldown);
                     return;
                 }
 
-                // Enhanced fluid animation with larger radius
-                const repelRadius = player.repelRadius();
+                const repelRadius = closestPlayer.repelRadius();
                 if (distance < repelRadius) {
                     const forceDirectionX = dx / distance;
                     const forceDirectionY = dy / distance;
@@ -101,10 +302,9 @@
                     const directionX = forceDirectionX * force * this.density;
                     const directionY = forceDirectionY * force * this.density;
                     
-                    // Increased movement effect for more visible animations
-                    const jitter = (Math.random() - 0.5) * 0.8;
-                    this.x += directionX * 0.3 + jitter;
-                    this.y += directionY * 0.3 + jitter;
+                    const jitter = (Math.random() - 0.5) * 0.5;
+                    this.x += directionX * 0.2 + jitter;
+                    this.y += directionY * 0.2 + jitter;
                 } else {
                     if (this.x !== this.baseX) {
                         const dx = this.x - this.baseX;
@@ -118,15 +318,14 @@
             }
         }
 
-        // Initialize particles with denser spacing
+        const particles = [];
         function initParticles() {
-            const spacing = 6;  
+            const spacing = 6;
             const cols = Math.floor(canvas.width / spacing);
             const rows = Math.floor(canvas.height / spacing);
 
             for (let i = 0; i < rows; i++) {
                 for (let j = 0; j < cols; j++) {
-                    // Add slight randomness to position for more natural look
                     const offsetX = (Math.random() - 0.5) * 2;
                     const offsetY = (Math.random() - 0.5) * 2;
                     particles.push(new Particle(
@@ -137,11 +336,6 @@
             }
         }
 
-        // Initialize particles
-        const particles = [];
-        initParticles();
-
-        // Handle keyboard input
         const keys = {
             ArrowLeft: false,
             ArrowRight: false,
@@ -161,79 +355,88 @@
             }
         });
 
-        // Update player position
-        function updatePlayer() {
+        function updatePlayer(player) {
             const oldX = player.x;
             const oldY = player.y;
 
-            if (keys.ArrowLeft) player.targetX -= player.speed;
-            if (keys.ArrowRight) player.targetX += player.speed;
-            if (keys.ArrowUp) player.targetY -= player.speed;
-            if (keys.ArrowDown) player.targetY += player.speed;
+            if (player === localPlayer) {
+                if (keys.ArrowLeft) player.targetX -= player.speed;
+                if (keys.ArrowRight) player.targetX += player.speed;
+                if (keys.ArrowUp) player.targetY -= player.speed;
+                if (keys.ArrowDown) player.targetY += player.speed;
+            }
 
-            // Smooth movement
             player.x += (player.targetX - player.x) * 0.1;
             player.y += (player.targetY - player.y) * 0.1;
 
-            // Keep player in bounds
             player.targetX = Math.max(player.size, Math.min(canvas.width - player.size, player.targetX));
             player.targetY = Math.max(player.size, Math.min(canvas.height - player.size, player.targetY));
 
-            // Check if player is moving
             const dx = player.x - oldX;
             const dy = player.y - oldY;
             player.isMoving = Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01;
+
+            players.forEach(otherPlayer => {
+                if (otherPlayer !== player) {
+                    const dx = otherPlayer.x - player.x;
+                    const dy = otherPlayer.y - player.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < (player.size + otherPlayer.size) / 2) {
+                        if (player.consumed > otherPlayer.consumed * 1.25) {
+                            otherPlayer.consumed = 0;
+                            otherPlayer.size = otherPlayer.baseSize;
+                            otherPlayer.x = Math.random() * canvas.width;
+                            otherPlayer.y = Math.random() * canvas.height;
+                            otherPlayer.targetX = otherPlayer.x;
+                            otherPlayer.targetY = otherPlayer.y;
+                        }
+                    }
+                }
+            });
         }
 
-        // Draw counter in corner
         function drawCounter() {
-            const padding = 10;
-            const text = `score: ${player.consumed}`;
-            ctx.font = '20px monospace';
-            const metrics = ctx.measureText(text);
-            const textHeight = 20; 
-
-            // Draw semi-transparent background
-            ctx.fillStyle = 'rgba(32, 32, 32, 0.7)';
-            ctx.fillRect(
-                padding, 
-                padding, 
-                metrics.width + padding * 2,
-                textHeight + padding * 2
-            );
-
-            // Draw text
-            ctx.fillStyle = '#f0f0f0';
-            ctx.font = '20px monospace';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'top';
-            ctx.fillText(text, padding * 2, padding * 2);
+            // Remove the counter drawing since it's now in the top bar
         }
 
-        // Draw player
-        function drawPlayer() {
+        function drawPlayer(player) {
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.size * 1.2, 0, Math.PI * 2);
+            ctx.strokeStyle = '#f0f0f0';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
             ctx.beginPath();
             ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
-            ctx.fillStyle = '#f0f0f0';
+            ctx.fillStyle = player === localPlayer ? '#f0f0f0' : '#a0a0a0';
             ctx.fill();
         }
 
-        // Animation loop
         function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            updatePlayer();
+            players.forEach(updatePlayer);
             particles.forEach(particle => {
                 particle.update();
                 particle.draw();
             });
-            drawPlayer();
-            drawCounter();  
+            players.forEach(drawPlayer);
             
+            broadcastState();
+            document.getElementById('score-display').innerText = `score: ${localPlayer.consumed}`;
             requestAnimationFrame(animate);
         }
 
-        // Initialize and start game
+        document.getElementById('join-button').addEventListener('click', () => {
+            const roomId = document.getElementById('room-input').value.trim();
+            if (roomId && roomId !== networkState.roomId) {
+                window.location.href = `?room=${roomId}`;
+            }
+        });
+
+        initParticles();
+        initNetworking();
         animate();
     </script>
 </body>
