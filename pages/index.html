@@ -41,19 +41,21 @@
             baseSize: 6,
             consumed: 0,
             canConsume: true,
-            consumeCooldown: 100,
+            consumeCooldown: 0,
             isMoving: false,
             lastX: canvas.width / 2,
             lastY: canvas.height / 2,
             consumeRadius: function() {
-                // Consumption radius gets relatively smaller as player grows
-                return this.size * 0.3;
+                return this.size * 1.2;
             },
             repelRadius: function() {
-                // Larger repel radius for more visible fluid animations
                 return this.size * 4;
-            }
+            },
+            trailLength: 5
         };
+
+        const playerTrail = [];
+        const maxTrailLength = 5;
 
         // Sand grain particle class
         class Particle {
@@ -66,32 +68,64 @@
                 this.density = Math.random() * 20 + 5;
                 this.color = '#606060';
                 this.isConsumed = false;
+                this.opacity = 1;
+                this.fadeSpeed = 0.2;
             }
 
             draw() {
-                if (this.isConsumed) return;
+                if (this.isConsumed) {
+                    if (this.opacity > 0) {
+                        this.opacity -= this.fadeSpeed;
+                        ctx.fillStyle = `rgba(96, 96, 96, ${this.opacity})`;
+                        ctx.fillRect(this.x, this.y, this.size, this.size);
+                    }
+                    return;
+                }
+                
                 ctx.fillStyle = this.color;
                 ctx.fillRect(this.x, this.y, this.size, this.size);
             }
 
             update() {
+                if (this.isConsumed && this.opacity <= 0) return;
+
                 if (this.isConsumed) return;
+
+                let shouldConsume = false;
+                const consumeRadius = player.consumeRadius();
+
+                const dxPlayer = player.x - this.x;
+                const dyPlayer = player.y - this.y;
+                const distancePlayer = Math.sqrt(dxPlayer * dxPlayer + dyPlayer * dyPlayer);
+
+                if (distancePlayer < consumeRadius && player.isMoving) {
+                    shouldConsume = true;
+                }
+
+                if (!shouldConsume) {
+                    for (const pos of playerTrail) {
+                        const dxTrail = pos.x - this.x;
+                        const dyTrail = pos.y - this.y;
+                        const distanceTrail = Math.sqrt(dxTrail * dxTrail + dyTrail * dyTrail);
+                        
+                        if (distanceTrail < consumeRadius) {
+                            shouldConsume = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (shouldConsume) {
+                    this.isConsumed = true;
+                    player.consumed++;
+                    player.size = player.baseSize * (1 + Math.floor(player.consumed / 100) * 0.1);
+                    return;
+                }
 
                 const dx = player.x - this.x;
                 const dy = player.y - this.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
-                // Check if particle can be consumed
-                if (distance < player.consumeRadius() && player.canConsume && player.isMoving) {
-                    this.isConsumed = true;
-                    player.consumed++;
-                    player.size = player.baseSize * (1 + Math.floor(player.consumed / 100) * 0.1);
-                    player.canConsume = false;
-                    setTimeout(() => { player.canConsume = true; }, player.consumeCooldown);
-                    return;
-                }
-
-                // Force field behavior
                 const attractionRadius = player.repelRadius() * 2;
                 const repelRadius = player.repelRadius() * 0.5;
                 
@@ -101,30 +135,24 @@
                     let force;
 
                     if (distance < repelRadius) {
-                        // Repel when too close to prevent clumping
                         force = -1 * (repelRadius - distance) / repelRadius;
                     } else {
-                        // Attract within the field with smooth falloff
                         force = 0.8 * (1 - distance / attractionRadius);
                         
-                        // Add swirling motion
                         const angle = Math.atan2(dy, dx);
                         const tangentialForce = 0.4 * force;
                         this.x += -Math.sin(angle) * tangentialForce * (player.isMoving ? 2 : 1);
                         this.y += Math.cos(angle) * tangentialForce * (player.isMoving ? 2 : 1);
                     }
 
-                    // Apply radial force
-                    const strength = player.isMoving ? 2 : 0.5; // Stronger effect when moving
+                    const strength = player.isMoving ? 2 : 0.5;
                     this.x += forceDirectionX * force * strength;
                     this.y += forceDirectionY * force * strength;
 
-                    // Add some randomness for more natural flow
                     const jitter = (Math.random() - 0.5) * 0.3;
                     this.x += jitter;
                     this.y += jitter;
                 } else {
-                    // Return to base position when outside force field
                     if (this.x !== this.baseX) {
                         const dx = this.x - this.baseX;
                         this.x -= dx * 0.05;
@@ -135,7 +163,6 @@
                     }
                 }
 
-                // Keep particles within canvas bounds
                 this.x = Math.max(0, Math.min(canvas.width, this.x));
                 this.y = Math.max(0, Math.min(canvas.height, this.y));
             }
@@ -149,7 +176,6 @@
 
             for (let i = 0; i < rows; i++) {
                 for (let j = 0; j < cols; j++) {
-                    // Add slight randomness to position for more natural look
                     const offsetX = (Math.random() - 0.5) * 2;
                     const offsetY = (Math.random() - 0.5) * 2;
                     particles.push(new Particle(
@@ -194,18 +220,22 @@
             if (keys.ArrowUp) player.targetY -= player.speed;
             if (keys.ArrowDown) player.targetY += player.speed;
 
-            // Smooth movement
             player.x += (player.targetX - player.x) * 0.1;
             player.y += (player.targetY - player.y) * 0.1;
 
-            // Keep player in bounds
             player.targetX = Math.max(player.size, Math.min(canvas.width - player.size, player.targetX));
             player.targetY = Math.max(player.size, Math.min(canvas.height - player.size, player.targetY));
 
-            // Check if player is moving
             const dx = player.x - oldX;
             const dy = player.y - oldY;
             player.isMoving = Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01;
+
+            if (player.isMoving) {
+                playerTrail.unshift({ x: player.x, y: player.y });
+                if (playerTrail.length > maxTrailLength) {
+                    playerTrail.pop();
+                }
+            }
         }
 
         // Draw counter in corner
@@ -216,7 +246,6 @@
             const metrics = ctx.measureText(text);
             const textHeight = 20; 
 
-            // Draw semi-transparent background
             ctx.fillStyle = 'rgba(32, 32, 32, 0.7)';
             ctx.fillRect(
                 padding, 
@@ -225,7 +254,6 @@
                 textHeight + padding * 2
             );
 
-            // Draw text
             ctx.fillStyle = '#f0f0f0';
             ctx.font = '20px monospace';
             ctx.textAlign = 'left';
