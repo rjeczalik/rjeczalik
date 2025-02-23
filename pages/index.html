@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>rafal.dev</title>
+    <title>Sand Eater</title>
     <style>
         body {
             margin: 0;
@@ -16,9 +16,9 @@
     </style>
 </head>
 <body>
-    <canvas id="sandCanvas"></canvas>
+    <canvas id="gameCanvas"></canvas>
     <script>
-        const canvas = document.getElementById('sandCanvas');
+        const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         
         // Set canvas size to window size
@@ -30,47 +30,68 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // ASCII art configuration - simplified to match grid
-        const textPattern = [
-            "  ____     _    ___   _    _     ____  _______   __",
-            " |  _ \\   / \\  |  _| / \\  | |   |  _ \\| ____\\ \\ / /",
-            " | |_) | / _ \\ | |  / _ \\ | |   | | | |  _|  \\ V / ",
-            " |  _ < / ___ \\| | / ___ \\| |___| |_| | |___  | |  ",
-            " |_| \\_/_/   \\_\\_|/_/   \\_\\_____|____/|_____| |_|  "
-        ];
+        // Game state
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            size: 6,
+            speed: 5,
+            targetX: canvas.width / 2,
+            targetY: canvas.height / 2,
+            baseSize: 6,
+            consumed: 0,
+            canConsume: true,
+            consumeCooldown: 100 // milliseconds
+        };
 
         // Sand grain particle class
         class Particle {
-            constructor(x, y, isText) {
+            constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.size = 4;  // Increased size for better visibility
-                this.isText = isText;
+                this.size = 2;  // Smaller size for denser appearance
                 this.baseX = x;
                 this.baseY = y;
-                this.density = Math.random() * 30 + 1;
-                this.color = isText ? '#f0f0f0' : '#808080';
+                this.density = Math.random() * 20 + 5;
+                this.color = '#606060';
+                this.isConsumed = false;
             }
 
             draw() {
+                if (this.isConsumed) return;
                 ctx.fillStyle = this.color;
                 ctx.fillRect(this.x, this.y, this.size, this.size);
             }
 
-            update(mouse) {
-                const dx = mouse.x - this.x;
-                const dy = mouse.y - this.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                const forceDirectionX = dx / distance;
-                const forceDirectionY = dy / distance;
-                const maxDistance = 100;
-                const force = (maxDistance - distance) / maxDistance;
-                const directionX = forceDirectionX * force * this.density;
-                const directionY = forceDirectionY * force * this.density;
+            update() {
+                if (this.isConsumed) return;
 
-                if (distance < maxDistance) {
-                    this.x -= directionX;
-                    this.y -= directionY;
+                const dx = player.x - this.x;
+                const dy = player.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                // Check if particle can be consumed
+                if (distance < player.size / 2 && player.canConsume) {
+                    this.isConsumed = true;
+                    player.consumed++;
+                    player.size = player.baseSize * (1 + Math.floor(player.consumed / 250) * 0.1);
+                    player.canConsume = false;
+                    setTimeout(() => { player.canConsume = true; }, player.consumeCooldown);
+                    return;
+                }
+
+                // Enhanced fluid animation
+                if (distance < 50) {
+                    const forceDirectionX = dx / distance;
+                    const forceDirectionY = dy / distance;
+                    const force = (50 - distance) / 50;
+                    const directionX = forceDirectionX * force * this.density;
+                    const directionY = forceDirectionY * force * this.density;
+                    
+                    // Add slight randomness to movement
+                    const jitter = (Math.random() - 0.5) * 0.5;
+                    this.x += directionX * 0.2 + jitter;
+                    this.y += directionY * 0.2 + jitter;
                 } else {
                     if (this.x !== this.baseX) {
                         const dx = this.x - this.baseX;
@@ -84,77 +105,96 @@
             }
         }
 
-        // Initialize particles
-        const particles = [];
-        const mouse = {
-            x: undefined,
-            y: undefined
-        };
-
-        function init() {
-            // Clear existing particles
-            particles.length = 0;
-
-            const spacing = 6;  // Grid spacing
-            const textScale = 4;  // Scale factor for text
+        // Initialize particles with denser spacing
+        function initParticles() {
+            const spacing = 6;  // Reduced spacing for denser grid
             const cols = Math.floor(canvas.width / spacing);
             const rows = Math.floor(canvas.height / spacing);
 
-            // Calculate text position to center it
-            const textWidth = textPattern[0].length * spacing * textScale;
-            const textHeight = textPattern.length * spacing * textScale;
-            const startX = Math.floor((canvas.width - textWidth) / 2);
-            const startY = Math.floor((canvas.height - textHeight) / 2);
-
-            // Create grid of particles
             for (let i = 0; i < rows; i++) {
                 for (let j = 0; j < cols; j++) {
-                    const x = j * spacing;
-                    const y = i * spacing;
-                    
-                    // Check if this position corresponds to a text character
-                    const textX = Math.floor((x - startX) / (spacing * textScale));
-                    const textY = Math.floor((y - startY) / (spacing * textScale));
-                    
-                    const isTextParticle = 
-                        textY >= 0 && 
-                        textY < textPattern.length && 
-                        textX >= 0 && 
-                        textX < textPattern[0].length && 
-                        textPattern[textY][textX] !== ' ' &&
-                        x >= startX && x < startX + textWidth &&
-                        y >= startY && y < startY + textHeight;
-
-                    particles.push(new Particle(x, y, isTextParticle));
+                    // Add slight randomness to position for more natural look
+                    const offsetX = (Math.random() - 0.5) * 2;
+                    const offsetY = (Math.random() - 0.5) * 2;
+                    particles.push(new Particle(
+                        j * spacing + offsetX,
+                        i * spacing + offsetY
+                    ));
                 }
             }
+        }
+
+        // Initialize particles
+        const particles = [];
+        initParticles();
+
+        // Handle keyboard input
+        const keys = {
+            ArrowLeft: false,
+            ArrowRight: false,
+            ArrowUp: false,
+            ArrowDown: false
+        };
+
+        window.addEventListener('keydown', (e) => {
+            if (keys.hasOwnProperty(e.key)) {
+                keys[e.key] = true;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (keys.hasOwnProperty(e.key)) {
+                keys[e.key] = false;
+            }
+        });
+
+        // Update player position
+        function updatePlayer() {
+            if (keys.ArrowLeft) player.targetX -= player.speed;
+            if (keys.ArrowRight) player.targetX += player.speed;
+            if (keys.ArrowUp) player.targetY -= player.speed;
+            if (keys.ArrowDown) player.targetY += player.speed;
+
+            // Smooth movement
+            player.x += (player.targetX - player.x) * 0.1;
+            player.y += (player.targetY - player.y) * 0.1;
+
+            // Keep player in bounds
+            player.targetX = Math.max(player.size, Math.min(canvas.width - player.size, player.targetX));
+            player.targetY = Math.max(player.size, Math.min(canvas.height - player.size, player.targetY));
+        }
+
+        // Draw player
+        function drawPlayer() {
+            // Draw player circle
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+            ctx.fillStyle = '#f0f0f0';
+            ctx.fill();
+
+            // Draw counter text
+            ctx.fillStyle = '#2a2a2a';
+            ctx.font = Math.max(12, player.size/2) + 'px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(player.consumed.toString(), player.x, player.y);
         }
 
         // Animation loop
         function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
+            updatePlayer();
             particles.forEach(particle => {
-                particle.update(mouse);
+                particle.update();
                 particle.draw();
             });
+            drawPlayer();
             
             requestAnimationFrame(animate);
         }
 
-        // Event listeners
-        canvas.addEventListener('mousemove', (e) => {
-            mouse.x = e.x;
-            mouse.y = e.y;
-        });
-
-        canvas.addEventListener('mouseleave', () => {
-            mouse.x = undefined;
-            mouse.y = undefined;
-        });
-
-        // Initialize and start animation
-        init();
+        // Initialize and start game
         animate();
     </script>
 </body>
