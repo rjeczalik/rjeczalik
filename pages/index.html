@@ -48,6 +48,7 @@
             isMoving: false,
             lastX: canvas.width / 2,
             lastY: canvas.height / 2,
+            showMovementHint: true,
             consumeRadius: function() {
                 return this.size * 0.8;
             },
@@ -365,13 +366,14 @@
         };
 
         window.addEventListener('keydown', (e) => {
-            if (keys.hasOwnProperty(e.key)) {
+            if (e.key in keys) {
                 keys[e.key] = true;
+                player.showMovementHint = false;
             }
         });
 
         window.addEventListener('keyup', (e) => {
-            if (keys.hasOwnProperty(e.key)) {
+            if (e.key in keys) {
                 keys[e.key] = false;
             }
         });
@@ -432,6 +434,85 @@
             ctx.fill();
         }
 
+        function drawMovementHint() {
+            if (!player.showMovementHint) return;
+
+            const keySize = 36;
+            const spacing = 42;
+            const cornerRadius = 6;
+            const centerX = player.x;
+            const centerY = player.y;
+            const opacity = 0.9;
+
+            ctx.save();
+            
+            function drawKey(x, y, arrow) {
+                // Key background
+                ctx.fillStyle = `rgba(40, 40, 40, ${opacity})`;
+                ctx.strokeStyle = `rgba(60, 60, 60, ${opacity})`;
+                ctx.lineWidth = 2;
+                
+                // Draw rounded rectangle
+                ctx.beginPath();
+                ctx.moveTo(x + cornerRadius, y);
+                ctx.lineTo(x + keySize - cornerRadius, y);
+                ctx.quadraticCurveTo(x + keySize, y, x + keySize, y + cornerRadius);
+                ctx.lineTo(x + keySize, y + keySize - cornerRadius);
+                ctx.quadraticCurveTo(x + keySize, y + keySize, x + keySize - cornerRadius, y + keySize);
+                ctx.lineTo(x + cornerRadius, y + keySize);
+                ctx.quadraticCurveTo(x, y + keySize, x, y + keySize - cornerRadius);
+                ctx.lineTo(x, y + cornerRadius);
+                ctx.quadraticCurveTo(x, y, x + cornerRadius, y);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                // Arrow symbol
+                ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+                ctx.beginPath();
+                
+                const margin = keySize * 0.25;
+                const arrowSize = keySize * 0.5;
+                
+                switch(arrow) {
+                    case 'up':
+                        ctx.moveTo(x + keySize/2, y + margin);
+                        ctx.lineTo(x + margin, y + keySize - margin);
+                        ctx.lineTo(x + keySize - margin, y + keySize - margin);
+                        break;
+                    case 'down':
+                        ctx.moveTo(x + keySize/2, y + keySize - margin);
+                        ctx.lineTo(x + margin, y + margin);
+                        ctx.lineTo(x + keySize - margin, y + margin);
+                        break;
+                    case 'left':
+                        ctx.moveTo(x + margin, y + keySize/2);
+                        ctx.lineTo(x + keySize - margin, y + margin);
+                        ctx.lineTo(x + keySize - margin, y + keySize - margin);
+                        break;
+                    case 'right':
+                        ctx.moveTo(x + keySize - margin, y + keySize/2);
+                        ctx.lineTo(x + margin, y + margin);
+                        ctx.lineTo(x + margin, y + keySize - margin);
+                        break;
+                }
+                ctx.closePath();
+                ctx.fill();
+
+                // Key shadow effect
+                ctx.fillStyle = `rgba(0, 0, 0, 0.2)`;
+                ctx.fillRect(x, y + keySize, keySize, 2);
+            }
+
+            // Draw all keys centered around the player
+            drawKey(centerX - keySize/2, centerY - spacing - keySize, 'up');
+            drawKey(centerX - spacing - keySize, centerY - keySize/2, 'left');
+            drawKey(centerX + spacing, centerY - keySize/2, 'right');
+            drawKey(centerX - keySize/2, centerY + spacing, 'down');
+
+            ctx.restore();
+        }
+
         function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -446,6 +527,7 @@
                 particle.draw();
             });
             drawPlayer();
+            drawMovementHint();
             drawCounter();
 
             requestAnimationFrame(animate);
