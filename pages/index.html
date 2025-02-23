@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sand Eater</title>
+    <title>rafal.dev</title>
     <style>
         body {
             margin: 0;
@@ -13,7 +13,7 @@
         canvas {
             display: block;
         }
-        
+
         @font-face {
             font-family: 'Inter';
             src: url('https://fonts.googleapis.com/css2?family=Inter:wght@700&display=swap');
@@ -25,17 +25,15 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        
-        // Set canvas size to window size
+
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
         }
-        
+
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Game state
         const player = {
             x: canvas.width / 2,
             y: canvas.height / 2,
@@ -51,21 +49,18 @@
             lastX: canvas.width / 2,
             lastY: canvas.height / 2,
             consumeRadius: function() {
-                // Smaller consumption radius
                 return this.size * 0.8;
             },
             repelRadius: function() {
-                // Increased max radius but still capped
                 const maxRepelRadius = 80;
                 return Math.min(this.size * 3.5, maxRepelRadius);
             },
-            trailLength: 3 // Shorter trail for less consumption
+            trailLength: 3
         };
 
         const playerTrail = [];
         const maxTrailLength = 3;
 
-        // Sand grain particle class
         class Particle {
             constructor(x, y) {
                 this.x = x;
@@ -89,7 +84,7 @@
                     }
                     return;
                 }
-                
+
                 ctx.fillStyle = this.color;
                 ctx.fillRect(this.x, this.y, this.size, this.size);
             }
@@ -115,7 +110,7 @@
                         const dxTrail = pos.x - this.x;
                         const dyTrail = pos.y - this.y;
                         const distanceTrail = Math.sqrt(dxTrail * dxTrail + dyTrail * dyTrail);
-                        
+
                         if (distanceTrail < consumeRadius) {
                             shouldConsume = true;
                             break;
@@ -126,7 +121,6 @@
                 if (shouldConsume) {
                     this.isConsumed = true;
                     player.consumed++;
-                    // Slower growth rate: now takes 300 particles for 10% growth
                     player.size = player.baseSize * (1 + Math.floor(player.consumed / 300) * 0.1);
                     return;
                 }
@@ -135,10 +129,9 @@
                 const dy = player.y - this.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
-                // Larger attraction radius relative to repel radius
                 const attractionRadius = player.repelRadius() * 2;
                 const repelRadius = player.repelRadius() * 0.45;
-                
+
                 if (distance < attractionRadius) {
                     const forceDirectionX = dx / distance;
                     const forceDirectionY = dy / distance;
@@ -148,7 +141,7 @@
                         force = -1 * (repelRadius - distance) / repelRadius;
                     } else {
                         force = 0.8 * (1 - distance / attractionRadius);
-                        
+
                         const angle = Math.atan2(dy, dx);
                         const tangentialForce = 0.4 * force;
                         this.x += -Math.sin(angle) * tangentialForce * (player.isMoving ? 2 : 1);
@@ -178,9 +171,8 @@
             }
         }
 
-        // Initialize particles with denser spacing
         function initParticles() {
-            const spacing = 6;  
+            const spacing = 6;
             const cols = Math.floor(canvas.width / spacing);
             const rows = Math.floor(canvas.height / spacing);
 
@@ -196,12 +188,10 @@
             }
         }
 
-        // ASCII art tiles for "rafal.dev"
         const textTiles = [];
-        const TILE_SIZE = 20;  // Increased tile size
-        const TILE_GAP = 3;    // Increased gap
-        
-        // ASCII patterns for each letter (1 represents a tile, 0 represents empty space)
+        const TILE_SIZE = 20;
+        const TILE_GAP = 3;
+
         const letterPatterns = {
             'r': [
                 [1,1,1,0],
@@ -257,7 +247,7 @@
                 [1,0,0,1],
                 [1,0,0,1],
                 [0,1,1,0],
-                [0,0,0,0]
+                [0,1,1,0]
             ]
         };
 
@@ -267,25 +257,24 @@
                 this.y = y;
                 this.width = TILE_SIZE;
                 this.height = TILE_SIZE;
-                this.baseColor = 'rgba(80, 80, 80, 0.4)';  // More visible base color
-                this.activeColor = 'rgba(255, 80, 80, 0.9)';  // Brighter active color
+                this.baseColor = 'rgba(80, 80, 80, 0.4)';
+                this.activeColor = 'rgba(255, 80, 80, 0.9)';
                 this.currentColor = this.baseColor;
                 this.isActive = false;
                 this.activationTime = 0;
-                this.fadeSpeed = 0.02;  // Slower fade for better visibility
+                this.fadeSpeed = 0.02;
                 this.glow = 0;
                 this.pulsePhase = Math.random() * Math.PI * 2;
             }
 
             update(playerX, playerY) {
-                // Enhanced ambient pulsing
                 this.glow = Math.sin(performance.now() * 0.001 + this.pulsePhase) * 0.15;
 
                 const dx = playerX - (this.x + this.width/2);
                 const dy = playerY - (this.y + this.height/2);
                 const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                if (distance < this.width * 2) {  // Larger activation radius
+
+                if (distance < this.width * 2) {
                     this.isActive = true;
                     this.activationTime = 1;
                 }
@@ -294,27 +283,24 @@
                     this.activationTime -= this.fadeSpeed;
                     const ratio = Math.max(0, this.activationTime);
                     if (this.isActive) {
-                        const alpha = 0.4 + ratio * 0.5 + this.glow;  // Higher base alpha
+                        const alpha = 0.4 + ratio * 0.5 + this.glow;
                         this.currentColor = `rgba(255, 80, 80, ${alpha})`;
-                        
-                        // Enhanced glow effect
                         ctx.shadowColor = 'rgba(255, 80, 80, 0.7)';
                         ctx.shadowBlur = 15;
                     } else {
-                        const alpha = 0.4 + ratio * 0.3 + this.glow;  // Higher base alpha
+                        const alpha = 0.4 + ratio * 0.3 + this.glow;
                         this.currentColor = `rgba(80, 80, 80, ${alpha})`;
                     }
                 } else {
                     this.isActive = false;
-                    const alpha = 0.4 + this.glow;  // Higher base alpha
+                    const alpha = 0.4 + this.glow;
                     this.currentColor = `rgba(80, 80, 80, ${alpha})`;
                 }
             }
 
             draw() {
-                // Draw border for extra visibility
                 ctx.beginPath();
-                const radius = 4;  // Larger radius for rounded corners
+                const radius = 4;
                 ctx.moveTo(this.x + radius, this.y);
                 ctx.lineTo(this.x + this.width - radius, this.y);
                 ctx.quadraticCurveTo(this.x + this.width, this.y, this.x + this.width, this.y + radius);
@@ -325,32 +311,30 @@
                 ctx.lineTo(this.x, this.y + radius);
                 ctx.quadraticCurveTo(this.x, this.y, this.x + radius, this.y);
                 ctx.closePath();
-                
-                // Draw tile with border
+
                 if (this.isActive) {
                     ctx.strokeStyle = 'rgba(255, 80, 80, 0.3)';
                     ctx.lineWidth = 2;
                     ctx.stroke();
                 }
-                
+
                 ctx.fillStyle = this.currentColor;
                 ctx.fill();
-                
+
                 ctx.shadowColor = 'transparent';
                 ctx.shadowBlur = 0;
             }
         }
 
-        // Initialize text tiles
         function initTextTiles() {
             const text = "rafal.dev";
             const totalWidth = text.split('').reduce((width, char) => {
                 return width + (letterPatterns[char]?.[0]?.length || 0) * (TILE_SIZE + TILE_GAP);
             }, 0);
-            
+
             let startX = (canvas.width - totalWidth) / 2;
             const startY = (canvas.height - 5 * (TILE_SIZE + TILE_GAP)) / 2;
-            
+
             text.split('').forEach(char => {
                 const pattern = letterPatterns[char];
                 if (pattern) {
@@ -369,12 +353,10 @@
             });
         }
 
-        // Initialize particles and text tiles
         const particles = [];
         initParticles();
         initTextTiles();
 
-        // Handle keyboard input
         const keys = {
             ArrowLeft: false,
             ArrowRight: false,
@@ -394,7 +376,6 @@
             }
         });
 
-        // Update player position
         function updatePlayer() {
             const oldX = player.x;
             const oldY = player.y;
@@ -422,18 +403,17 @@
             }
         }
 
-        // Draw counter in corner
         function drawCounter() {
             const padding = 10;
             const text = `score: ${player.consumed}`;
             ctx.font = '20px monospace';
             const metrics = ctx.measureText(text);
-            const textHeight = 20; 
+            const textHeight = 20;
 
             ctx.fillStyle = 'rgba(32, 32, 32, 0.7)';
             ctx.fillRect(
-                padding, 
-                padding, 
+                padding,
+                padding,
                 metrics.width + padding * 2,
                 textHeight + padding * 2
             );
@@ -445,7 +425,6 @@
             ctx.fillText(text, padding * 2, padding * 2);
         }
 
-        // Draw player
         function drawPlayer() {
             ctx.beginPath();
             ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
@@ -453,16 +432,14 @@
             ctx.fill();
         }
 
-        // Animation loop
         function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Update and draw text tiles first (background layer)
+
             textTiles.forEach(tile => {
                 tile.update(player.x, player.y);
                 tile.draw();
             });
-            
+
             updatePlayer();
             particles.forEach(particle => {
                 particle.update();
@@ -470,11 +447,10 @@
             });
             drawPlayer();
             drawCounter();
-            
+
             requestAnimationFrame(animate);
         }
 
-        // Initialize and start game
         animate();
     </script>
 </body>
