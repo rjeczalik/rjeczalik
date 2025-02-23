@@ -46,16 +46,19 @@
             lastX: canvas.width / 2,
             lastY: canvas.height / 2,
             consumeRadius: function() {
-                return this.size * 1.2;
+                // Smaller consumption radius
+                return this.size * 0.8;
             },
             repelRadius: function() {
-                return this.size * 4;
+                // Increased max radius but still capped
+                const maxRepelRadius = 80;
+                return Math.min(this.size * 3.5, maxRepelRadius);
             },
-            trailLength: 5
+            trailLength: 3 // Shorter trail for less consumption
         };
 
         const playerTrail = [];
-        const maxTrailLength = 5;
+        const maxTrailLength = 3;
 
         // Sand grain particle class
         class Particle {
@@ -118,7 +121,8 @@
                 if (shouldConsume) {
                     this.isConsumed = true;
                     player.consumed++;
-                    player.size = player.baseSize * (1 + Math.floor(player.consumed / 100) * 0.1);
+                    // Slower growth rate: now takes 300 particles for 10% growth
+                    player.size = player.baseSize * (1 + Math.floor(player.consumed / 300) * 0.1);
                     return;
                 }
 
@@ -126,8 +130,9 @@
                 const dy = player.y - this.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
+                // Larger attraction radius relative to repel radius
                 const attractionRadius = player.repelRadius() * 2;
-                const repelRadius = player.repelRadius() * 0.5;
+                const repelRadius = player.repelRadius() * 0.45;
                 
                 if (distance < attractionRadius) {
                     const forceDirectionX = dx / distance;
