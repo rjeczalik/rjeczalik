@@ -35,13 +35,24 @@
             x: canvas.width / 2,
             y: canvas.height / 2,
             size: 6,
-            speed: 5,
+            speed: 3,
             targetX: canvas.width / 2,
             targetY: canvas.height / 2,
             baseSize: 6,
             consumed: 0,
             canConsume: true,
-            consumeCooldown: 100 // milliseconds
+            consumeCooldown: 100,
+            isMoving: false,
+            lastX: canvas.width / 2,
+            lastY: canvas.height / 2,
+            consumeRadius: function() {
+                // Consumption radius gets relatively smaller as player grows
+                return this.size * 0.3;
+            },
+            repelRadius: function() {
+                // Larger repel radius for more visible fluid animations
+                return this.size * 4;
+            }
         };
 
         // Sand grain particle class
@@ -49,7 +60,7 @@
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.size = 2;  // Smaller size for denser appearance
+                this.size = 2;
                 this.baseX = x;
                 this.baseY = y;
                 this.density = Math.random() * 20 + 5;
@@ -70,28 +81,30 @@
                 const dy = player.y - this.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
-                // Check if particle can be consumed
-                if (distance < player.size / 2 && player.canConsume) {
+                // Check if particle can be consumed - only if player is moving
+                if (distance < player.consumeRadius() && player.canConsume && player.isMoving) {
                     this.isConsumed = true;
                     player.consumed++;
-                    player.size = player.baseSize * (1 + Math.floor(player.consumed / 250) * 0.1);
+                    // Grow by 10% every 100 particles
+                    player.size = player.baseSize * (1 + Math.floor(player.consumed / 100) * 0.1);
                     player.canConsume = false;
                     setTimeout(() => { player.canConsume = true; }, player.consumeCooldown);
                     return;
                 }
 
-                // Enhanced fluid animation
-                if (distance < 50) {
+                // Enhanced fluid animation with larger radius
+                const repelRadius = player.repelRadius();
+                if (distance < repelRadius) {
                     const forceDirectionX = dx / distance;
                     const forceDirectionY = dy / distance;
-                    const force = (50 - distance) / 50;
+                    const force = (repelRadius - distance) / repelRadius;
                     const directionX = forceDirectionX * force * this.density;
                     const directionY = forceDirectionY * force * this.density;
                     
-                    // Add slight randomness to movement
-                    const jitter = (Math.random() - 0.5) * 0.5;
-                    this.x += directionX * 0.2 + jitter;
-                    this.y += directionY * 0.2 + jitter;
+                    // Increased movement effect for more visible animations
+                    const jitter = (Math.random() - 0.5) * 0.8;
+                    this.x += directionX * 0.3 + jitter;
+                    this.y += directionY * 0.3 + jitter;
                 } else {
                     if (this.x !== this.baseX) {
                         const dx = this.x - this.baseX;
@@ -107,7 +120,7 @@
 
         // Initialize particles with denser spacing
         function initParticles() {
-            const spacing = 6;  // Reduced spacing for denser grid
+            const spacing = 6;  
             const cols = Math.floor(canvas.width / spacing);
             const rows = Math.floor(canvas.height / spacing);
 
@@ -150,6 +163,9 @@
 
         // Update player position
         function updatePlayer() {
+            const oldX = player.x;
+            const oldY = player.y;
+
             if (keys.ArrowLeft) player.targetX -= player.speed;
             if (keys.ArrowRight) player.targetX += player.speed;
             if (keys.ArrowUp) player.targetY -= player.speed;
@@ -162,22 +178,44 @@
             // Keep player in bounds
             player.targetX = Math.max(player.size, Math.min(canvas.width - player.size, player.targetX));
             player.targetY = Math.max(player.size, Math.min(canvas.height - player.size, player.targetY));
+
+            // Check if player is moving
+            const dx = player.x - oldX;
+            const dy = player.y - oldY;
+            player.isMoving = Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01;
+        }
+
+        // Draw counter in corner
+        function drawCounter() {
+            const padding = 10;
+            const text = `score: ${player.consumed}`;
+            ctx.font = '20px monospace';
+            const metrics = ctx.measureText(text);
+            const textHeight = 20; 
+
+            // Draw semi-transparent background
+            ctx.fillStyle = 'rgba(32, 32, 32, 0.7)';
+            ctx.fillRect(
+                padding, 
+                padding, 
+                metrics.width + padding * 2,
+                textHeight + padding * 2
+            );
+
+            // Draw text
+            ctx.fillStyle = '#f0f0f0';
+            ctx.font = '20px monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText(text, padding * 2, padding * 2);
         }
 
         // Draw player
         function drawPlayer() {
-            // Draw player circle
             ctx.beginPath();
             ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
             ctx.fillStyle = '#f0f0f0';
             ctx.fill();
-
-            // Draw counter text
-            ctx.fillStyle = '#2a2a2a';
-            ctx.font = Math.max(12, player.size/2) + 'px monospace';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(player.consumed.toString(), player.x, player.y);
         }
 
         // Animation loop
@@ -190,6 +228,7 @@
                 particle.draw();
             });
             drawPlayer();
+            drawCounter();  
             
             requestAnimationFrame(animate);
         }
