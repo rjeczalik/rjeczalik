@@ -93,7 +93,7 @@
             connections: new Map(),
             isHost: false,
             roomId: null,
-            playerId: Math.random().toString(36).substr(2, 9),
+            playerId: null,
             eventQueue: [],
             lastBroadcast: 0,
             broadcastInterval: 50,
@@ -106,9 +106,17 @@
             }
         }
 
+        function generatePlayerId() {
+            return Math.random().toString(36).substr(2, 9);
+        }
+
+        function generateRoomId() {
+            return Math.random().toString(36).substr(2, 6);
+        }
+
         const players = new Map();
         const localPlayer = {
-            id: networkState.playerId,
+            id: null,
             x: canvas.width / 2,
             y: canvas.height / 2,
             size: 6,
@@ -129,52 +137,76 @@
                 return this.size * 4;
             }
         };
-        players.set(localPlayer.id, localPlayer);
 
         function initNetworking() {
             const urlParams = new URLSearchParams(window.location.search);
             const roomId = urlParams.get('room');
             
-            networkState.peer = new Peer(networkState.playerId);
+            if (roomId) {
+                // Joining existing room
+                networkState.roomId = roomId;
+                networkState.isHost = false;
+                networkState.playerId = generatePlayerId();
+                document.getElementById('room-input').value = roomId;
+                debugLog('Joining room', { roomId, playerId: networkState.playerId });
+            } else {
+                // Creating new room as host
+                networkState.roomId = generateRoomId();
+                networkState.isHost = true;
+                networkState.playerId = generatePlayerId();
+                document.getElementById('room-input').value = networkState.roomId;
+                window.history.pushState({}, '', `?room=${networkState.roomId}`);
+                debugLog('Created new room', { roomId: networkState.roomId, playerId: networkState.playerId });
+            }
+
+            const peerId = networkState.isHost ? 
+                `${networkState.roomId}-host` : 
+                `${networkState.roomId}-${networkState.playerId}`;
+
+            networkState.peer = new Peer(peerId, {
+                host: '0.peerjs.com',
+                secure: true,
+                port: 443,
+                path: '/',
+                debug: networkState.debug ? 2 : 0,
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' }
+                    ]
+                }
+            });
             
             networkState.peer.on('open', id => {
-                debugLog('PeerJS connection opened', { id });
+                debugLog('PeerJS connection opened', { id, isHost: networkState.isHost });
+                if (!networkState.isHost) {
+                    connectToPeer(`${networkState.roomId}-host`);
+                }
             });
 
             networkState.peer.on('error', err => {
                 debugLog('PeerJS error', { error: err.type });
+                if (err.type === 'peer-unavailable' && !networkState.isHost) {
+                    alert('Room not found or host disconnected');
+                }
             });
             
-            if (roomId) {
-                networkState.roomId = roomId;
-                networkState.isHost = false;
-                document.getElementById('room-input').value = roomId;
-                connectToPeer(roomId);
-                debugLog('Joining room', { roomId });
-            } else {
-                networkState.roomId = networkState.playerId;
-                networkState.isHost = true;
-                document.getElementById('room-input').value = networkState.roomId;
-                window.history.pushState({}, '', `?room=${networkState.roomId}`);
-                debugLog('Created new room', { roomId: networkState.roomId });
-            }
-
             networkState.peer.on('connection', handleConnection);
         }
 
         function connectToPeer(peerId) {
-            debugLog('Initiating connection to peer', { peerId });
+            debugLog('Initiating connection to peer', { peerId, fromPeerId: networkState.peer.id });
             const conn = networkState.peer.connect(peerId);
             handleConnection(conn);
         }
 
         function handleConnection(conn) {
-            debugLog('New connection established', { peer: conn.peer });
+            debugLog('New connection established', { peer: conn.peer, local: networkState.playerId });
 
             conn.on('open', () => {
                 networkState.connections.set(conn.peer, conn);
                 const state = {
                     type: 'state',
+                    playerId: networkState.playerId,
                     players: Array.from(players.values()).map(p => ({
                         id: p.id,
                         x: p.x,
@@ -208,7 +240,7 @@
                 case 'state':
                     debugLog('Processing state update', { players: data.players.length });
                     data.players.forEach(p => {
-                        if (p.id !== localPlayer.id) {
+                        if (p.id !== networkState.playerId) {
                             if (!players.has(p.id)) {
                                 players.set(p.id, {
                                     ...localPlayer,
@@ -222,7 +254,7 @@
                     });
                     break;
                 case 'update':
-                    if (data.playerId !== localPlayer.id) {
+                    if (data.playerId !== networkState.playerId) {
                         debugLog('Processing player update', { playerId: data.playerId });
                         const player = players.get(data.playerId);
                         if (player) {
@@ -238,7 +270,7 @@
             if (now - networkState.lastBroadcast >= networkState.broadcastInterval) {
                 const state = {
                     type: 'update',
-                    playerId: localPlayer.id,
+                    playerId: networkState.playerId,
                     state: {
                         x: localPlayer.x,
                         y: localPlayer.y,
@@ -444,6 +476,8 @@
                 window.location.href = `?room=${roomId}`;
             }
         });
+
+        players.set(networkState.playerId, localPlayer);
 
         initParticles();
         initNetworking();
