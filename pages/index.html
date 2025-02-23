@@ -81,40 +81,63 @@
                 const dy = player.y - this.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
-                // Check if particle can be consumed - only if player is moving
+                // Check if particle can be consumed
                 if (distance < player.consumeRadius() && player.canConsume && player.isMoving) {
                     this.isConsumed = true;
                     player.consumed++;
-                    // Grow by 10% every 100 particles
                     player.size = player.baseSize * (1 + Math.floor(player.consumed / 100) * 0.1);
                     player.canConsume = false;
                     setTimeout(() => { player.canConsume = true; }, player.consumeCooldown);
                     return;
                 }
 
-                // Enhanced fluid animation with larger radius
-                const repelRadius = player.repelRadius();
-                if (distance < repelRadius) {
+                // Force field behavior
+                const attractionRadius = player.repelRadius() * 2;
+                const repelRadius = player.repelRadius() * 0.5;
+                
+                if (distance < attractionRadius) {
                     const forceDirectionX = dx / distance;
                     const forceDirectionY = dy / distance;
-                    const force = (repelRadius - distance) / repelRadius;
-                    const directionX = forceDirectionX * force * this.density;
-                    const directionY = forceDirectionY * force * this.density;
-                    
-                    // Increased movement effect for more visible animations
-                    const jitter = (Math.random() - 0.5) * 0.8;
-                    this.x += directionX * 0.3 + jitter;
-                    this.y += directionY * 0.3 + jitter;
+                    let force;
+
+                    if (distance < repelRadius) {
+                        // Repel when too close to prevent clumping
+                        force = -1 * (repelRadius - distance) / repelRadius;
+                    } else {
+                        // Attract within the field with smooth falloff
+                        force = 0.8 * (1 - distance / attractionRadius);
+                        
+                        // Add swirling motion
+                        const angle = Math.atan2(dy, dx);
+                        const tangentialForce = 0.4 * force;
+                        this.x += -Math.sin(angle) * tangentialForce * (player.isMoving ? 2 : 1);
+                        this.y += Math.cos(angle) * tangentialForce * (player.isMoving ? 2 : 1);
+                    }
+
+                    // Apply radial force
+                    const strength = player.isMoving ? 2 : 0.5; // Stronger effect when moving
+                    this.x += forceDirectionX * force * strength;
+                    this.y += forceDirectionY * force * strength;
+
+                    // Add some randomness for more natural flow
+                    const jitter = (Math.random() - 0.5) * 0.3;
+                    this.x += jitter;
+                    this.y += jitter;
                 } else {
+                    // Return to base position when outside force field
                     if (this.x !== this.baseX) {
                         const dx = this.x - this.baseX;
-                        this.x -= dx/10;
+                        this.x -= dx * 0.05;
                     }
                     if (this.y !== this.baseY) {
                         const dy = this.y - this.baseY;
-                        this.y -= dy/10;
+                        this.y -= dy * 0.05;
                     }
                 }
+
+                // Keep particles within canvas bounds
+                this.x = Math.max(0, Math.min(canvas.width, this.x));
+                this.y = Math.max(0, Math.min(canvas.height, this.y));
             }
         }
 
