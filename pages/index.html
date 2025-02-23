@@ -8,12 +8,41 @@
             margin: 0;
             overflow: hidden;
             background: #1a1a1a;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
+            font-family: monospace;
         }
         canvas {
-            flex-grow: 1;
+            background: #2a2a2a;
+        }
+        #controls {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            color: #8a8a8a;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        input {
+            background: #3a3a3a;
+            border: 1px solid #4a4a4a;
+            color: #aaaaaa;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        button {
+            background: #4a4a4a;
+            border: none;
+            color: #aaaaaa;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #5a5a5a;
+        }
+        #score-display {
+            color: #8a8a8a;
         }
         .top-bar {
             padding: 10px;
@@ -46,19 +75,6 @@
             position: absolute;
             left: 50%;
             transform: translateX(-50%);
-        }
-        input, button {
-            background: #000;
-            border: 1px solid #f0f0f0;
-            color: #f0f0f0;
-            padding: 5px 10px;
-            font-family: monospace;
-            font-size: 16px;
-            pointer-events: auto;
-        }
-        button:hover {
-            background: #f0f0f0;
-            color: #000;
         }
     </style>
 </head>
@@ -341,12 +357,130 @@
             }
         }
 
+        class SpatialGrid {
+            constructor(width, height, cellSize) {
+                this.cellSize = cellSize;
+                this.cols = Math.ceil(width / cellSize);
+                this.rows = Math.ceil(height / cellSize);
+                this.grid = new Array(this.cols * this.rows).fill().map(() => []);
+            }
+
+            clear() {
+                this.grid.forEach(cell => cell.length = 0);
+            }
+
+            getCell(x, y) {
+                const col = Math.floor(x / this.cellSize);
+                const row = Math.floor(y / this.cellSize);
+                if (col < 0 || col >= this.cols || row < 0 || row >= this.rows) return null;
+                return this.grid[row * this.cols + col];
+            }
+
+            insert(item, x, y) {
+                const cell = this.getCell(x, y);
+                if (cell) cell.push(item);
+            }
+
+            getNearby(x, y, radius) {
+                const startCol = Math.max(0, Math.floor((x - radius) / this.cellSize));
+                const endCol = Math.min(this.cols - 1, Math.floor((x + radius) / this.cellSize));
+                const startRow = Math.max(0, Math.floor((y - radius) / this.cellSize));
+                const endRow = Math.min(this.rows - 1, Math.floor((y + radius) / this.cellSize));
+                
+                const nearby = [];
+                for (let row = startRow; row <= endRow; row++) {
+                    for (let col = startCol; col <= endCol; col++) {
+                        nearby.push(...this.grid[row * this.cols + col]);
+                    }
+                }
+                return nearby;
+            }
+        }
+
+        const MAX_PARTICLES = 50000;
+        const CELL_SIZE = 20;
+        const spatialGrid = new SpatialGrid(canvas.width, canvas.height, CELL_SIZE);
+        let particles = [];
+
+        // Color scheme
+        const COLORS = {
+            background: '#2a2a2a',
+            particles: {
+                base: '#8a8a8a',
+                bright: '#c0c0c0',
+                glow: '#ffffff'
+            },
+            player: {
+                local: '#4a9eff',
+                remote: '#ff4a4a',
+                glow: 'rgba(255, 255, 255, 0.2)'
+            }
+        };
+
+        function initParticles() {
+            particles = [];
+            const numParticles = Math.min(MAX_PARTICLES, Math.floor((canvas.width * canvas.height) / 300));
+            const gridSize = Math.sqrt(numParticles);
+            const spacingX = canvas.width / gridSize;
+            const spacingY = canvas.height / gridSize;
+            
+            for (let i = 0; i < gridSize; i++) {
+                for (let j = 0; j < gridSize; j++) {
+                    const x = (j + Math.random() * 0.8) * spacingX;
+                    const y = (i + Math.random() * 0.8) * spacingY;
+                    particles.push(new Particle(x, y));
+                }
+            }
+        }
+
         class Particle {
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
+                this.vx = 0;
+                this.vy = 0;
+                this.ax = 0;
+                this.ay = 0;
                 this.isConsumed = false;
-                this.brightness = Math.random() * 0.5 + 0.5;
+                this.brightness = Math.random() * 0.4 + 0.6;
+                this.mass = Math.random() * 0.5 + 0.5;
+                this.friction = 0.98;
+                this.maxSpeed = 2;
+                this.baseColor = COLORS.particles.base;
+                this.brightColor = COLORS.particles.bright;
+                this.glowColor = COLORS.particles.glow;
+                this.size = Math.random() * 0.8 + 1.2;
+            }
+
+            draw() {
+                if (this.isConsumed) return;
+                
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                const alpha = this.brightness * (0.6 + speed * 0.4);
+                const size = this.size + speed * 0.4;
+                
+                // Enhanced glow for better visibility
+                if (speed > 0.5) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, size * 2, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.08})`;
+                    ctx.fill();
+                }
+
+                // Draw base particle with stronger color
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
+                const color = speed > 0.8 ? this.brightColor : this.baseColor;
+                ctx.fillStyle = `rgba(${color}, ${alpha})`;
+                ctx.fill();
+
+                // Add highlight for extra visibility
+                if (speed > 0.3) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, size * 0.4, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(${this.glowColor}, ${alpha * 0.3})`;
+                    ctx.fill();
+                }
             }
 
             update() {
@@ -354,8 +488,12 @@
 
                 let closestPlayer = null;
                 let minDistance = Infinity;
-                
-                players.forEach(player => {
+                let totalForceX = 0;
+                let totalForceY = 0;
+
+                // Use spatial grid for player detection
+                const nearbyPlayers = spatialGrid.getNearby(this.x, this.y, 100);
+                nearbyPlayers.forEach(player => {
                     const dx = player.x - this.x;
                     const dy = player.y - this.y;
                     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -364,76 +502,99 @@
                         minDistance = distance;
                         closestPlayer = player;
                     }
+
+                    if (distance < player.repelRadius()) {
+                        const force = (player.repelRadius() - distance) / player.repelRadius();
+                        const angle = Math.atan2(dy, dx);
+                        totalForceX += Math.cos(angle) * force * (player.isMoving ? 2 : 1);
+                        totalForceY += Math.sin(angle) * force * (player.isMoving ? 2 : 1);
+                    }
                 });
 
                 if (!closestPlayer) return;
 
-                const dx = closestPlayer.x - this.x;
-                const dy = closestPlayer.y - this.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-
-                if (distance < closestPlayer.consumeRadius() && closestPlayer.canConsume && closestPlayer.isMoving) {
+                if (minDistance < closestPlayer.consumeRadius() && closestPlayer.canConsume && closestPlayer.isMoving) {
                     this.isConsumed = true;
                     closestPlayer.consumed++;
                     closestPlayer.size = closestPlayer.baseSize + Math.sqrt(closestPlayer.consumed) * 0.5;
-                } else if (distance < closestPlayer.repelRadius()) {
-                    const repelStrength = 0.05;
-                    const normalizedDx = dx / distance;
-                    const normalizedDy = dy / distance;
-                    const repelForce = (closestPlayer.repelRadius() - distance) / closestPlayer.repelRadius();
-                    
-                    this.x -= normalizedDx * repelForce * repelStrength;
-                    this.y -= normalizedDy * repelForce * repelStrength;
-                    
-                    this.x = Math.max(0, Math.min(canvas.width, this.x));
-                    this.y = Math.max(0, Math.min(canvas.height, this.y));
+                    return;
                 }
-            }
 
-            draw() {
-                if (this.isConsumed) return;
+                // Apply forces with improved physics
+                this.ax = -totalForceX * 0.15;
+                this.ay = -totalForceY * 0.15;
+
+                this.vx += this.ax;
+                this.vy += this.ay;
+                this.vx *= this.friction;
+                this.vy *= this.friction;
+
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                if (speed > this.maxSpeed) {
+                    const scale = this.maxSpeed / speed;
+                    this.vx *= scale;
+                    this.vy *= scale;
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Improved boundary behavior
+                if (this.x < 0) { 
+                    this.x = 0; 
+                    this.vx *= -0.8; 
+                    this.ax = Math.abs(this.ax) * 0.5;
+                } else if (this.x > canvas.width) { 
+                    this.x = canvas.width; 
+                    this.vx *= -0.8;
+                    this.ax = -Math.abs(this.ax) * 0.5;
+                }
                 
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, 1, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(240, 240, 240, ${this.brightness})`;
-                ctx.fill();
-            }
-        }
-
-        const particles = [];
-        function initParticles() {
-            const spacing = 6;
-            const cols = Math.floor(canvas.width / spacing);
-            const rows = Math.floor(canvas.height / spacing);
-
-            for (let i = 0; i < rows; i++) {
-                for (let j = 0; j < cols; j++) {
-                    const offsetX = (Math.random() - 0.5) * 2;
-                    const offsetY = (Math.random() - 0.5) * 2;
-                    particles.push(new Particle(
-                        j * spacing + offsetX,
-                        i * spacing + offsetY
-                    ));
+                if (this.y < 0) { 
+                    this.y = 0; 
+                    this.vy *= -0.8;
+                    this.ay = Math.abs(this.ay) * 0.5;
+                } else if (this.y > canvas.height) { 
+                    this.y = canvas.height; 
+                    this.vy *= -0.8;
+                    this.ay = -Math.abs(this.ay) * 0.5;
                 }
             }
         }
 
-        const keys = {
-            ArrowLeft: false,
-            ArrowRight: false,
-            ArrowUp: false,
-            ArrowDown: false
+        // Animation timing variables
+        let lastFrameTime = performance.now();
+        const targetFPS = 60;
+        const frameInterval = 1000 / targetFPS;
+
+        // Track player movement state
+        const playerState = {
+            keys: {
+                ArrowLeft: false,
+                ArrowRight: false,
+                ArrowUp: false,
+                ArrowDown: false
+            },
+            lastBroadcastedState: {
+                x: 0,
+                y: 0,
+                isMoving: false
+            },
+            movementThreshold: 1, // minimum movement distance to trigger update
+            stateChanged: false
         };
 
         window.addEventListener('keydown', (e) => {
-            if (keys.hasOwnProperty(e.key)) {
-                keys[e.key] = true;
+            if (playerState.keys.hasOwnProperty(e.key) && !playerState.keys[e.key]) {
+                playerState.keys[e.key] = true;
+                playerState.stateChanged = true;
             }
         });
 
         window.addEventListener('keyup', (e) => {
-            if (keys.hasOwnProperty(e.key)) {
-                keys[e.key] = false;
+            if (playerState.keys.hasOwnProperty(e.key) && playerState.keys[e.key]) {
+                playerState.keys[e.key] = false;
+                playerState.stateChanged = true;
             }
         });
 
@@ -444,18 +605,46 @@
             const oldY = player.y;
             
             if (player.id === networkState.playerId) {
-                if (keys.ArrowLeft) player.x -= player.speed;
-                if (keys.ArrowRight) player.x += player.speed;
-                if (keys.ArrowUp) player.y -= player.speed;
-                if (keys.ArrowDown) player.y += player.speed;
+                if (playerState.keys.ArrowLeft) player.x -= player.speed;
+                if (playerState.keys.ArrowRight) player.x += player.speed;
+                if (playerState.keys.ArrowUp) player.y -= player.speed;
+                if (playerState.keys.ArrowDown) player.y += player.speed;
                 
                 player.x = Math.max(player.size, Math.min(canvas.width - player.size, player.x));
                 player.y = Math.max(player.size, Math.min(canvas.height - player.size, player.y));
+
+                const dx = player.x - oldX;
+                const dy = player.y - oldY;
+                player.isMoving = Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01;
+
+                // Check if we should broadcast state
+                const distMoved = Math.sqrt(
+                    Math.pow(player.x - playerState.lastBroadcastedState.x, 2) +
+                    Math.pow(player.y - playerState.lastBroadcastedState.y, 2)
+                );
+
+                if (playerState.stateChanged || 
+                    distMoved > playerState.movementThreshold || 
+                    player.isMoving !== playerState.lastBroadcastedState.isMoving) {
+                    
+                    networkWorker.postMessage({
+                        type: 'updateState',
+                        data: {
+                            x: player.x,
+                            y: player.y,
+                            isMoving: player.isMoving,
+                            keys: {...playerState.keys}
+                        }
+                    });
+
+                    playerState.lastBroadcastedState = {
+                        x: player.x,
+                        y: player.y,
+                        isMoving: player.isMoving
+                    };
+                    playerState.stateChanged = false;
+                }
             }
-            
-            const dx = player.x - oldX;
-            const dy = player.y - oldY;
-            player.isMoving = Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01;
         }
 
         function drawCounter() {
@@ -463,51 +652,179 @@
         }
 
         function drawPlayer(player) {
-            // Draw highlight ring for local player
-            if (player.id === networkState.playerId) {
-                ctx.beginPath();
-                ctx.arc(player.x, player.y, player.size * 1.2, 0, Math.PI * 2);
-                ctx.strokeStyle = '#f0f0f0';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            }
-
+            const isLocal = player.id === networkState.playerId;
+            const color = isLocal ? COLORS.player.local : COLORS.player.remote;
+            
+            // Draw glow
             ctx.beginPath();
-            ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
-            ctx.fillStyle = player.id === networkState.playerId ? '#f0f0f0' : '#808080';
+            ctx.arc(player.x, player.y, player.size * 1.2, 0, Math.PI * 2);
+            ctx.fillStyle = COLORS.player.glow;
             ctx.fill();
 
+            // Draw player
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+
+            // Draw ring
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.size * 1.1, 0, Math.PI * 2);
+            ctx.strokeStyle = COLORS.player.glow;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
             if (networkState.debug) {
-                ctx.fillStyle = '#f0f0f0';
+                ctx.fillStyle = '#ffffff';
                 ctx.font = '12px monospace';
                 ctx.fillText(player.id.substring(0, 4), player.x - 15, player.y - player.size - 5);
             }
         }
 
-        function animate() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            if (localPlayer) {
-                updatePlayer(localPlayer);
-            }
-            
-            particles.forEach(particle => {
-                particle.update();
-                particle.draw();
-            });
+        function animate(currentTime) {
+            const deltaTime = currentTime - lastFrameTime;
 
-            // Draw all players and log count
-            const playerCount = players.size;
-            debugLog('Rendering players', { count: playerCount, ids: Array.from(players.keys()) });
-            
-            players.forEach((player, id) => {
-                debugLog('Drawing player', { id: id, x: player.x, y: player.y });
-                drawPlayer(player);
-            });
-            
-            broadcastState();
-            document.getElementById('score-display').innerText = `score: ${localPlayer ? localPlayer.consumed : 0}`;
+            if (deltaTime >= frameInterval) {
+                lastFrameTime = currentTime - (deltaTime % frameInterval);
+
+                // Clear with alpha for motion blur
+                ctx.fillStyle = 'rgba(42, 42, 42, 0.2)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Update spatial grid
+                spatialGrid.clear();
+                players.forEach(player => {
+                    spatialGrid.insert(player, player.x, player.y);
+                });
+
+                if (localPlayer) {
+                    updatePlayer(localPlayer);
+                }
+
+                // Update particles in chunks
+                const chunkSize = 100;
+                for (let i = 0; i < particles.length; i += chunkSize) {
+                    const end = Math.min(i + chunkSize, particles.length);
+                    for (let j = i; j < end; j++) {
+                        if (!particles[j].isConsumed) {
+                            particles[j].update();
+                        }
+                    }
+                }
+
+                // Batch render particles with glow effect
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                particles.forEach(p => {
+                    if (!p.isConsumed) p.draw();
+                });
+                ctx.restore();
+
+                // Draw players with effects
+                players.forEach(drawPlayer);
+
+                // Update score with style
+                document.getElementById('score-display').innerText = 
+                    `score: ${localPlayer ? localPlayer.consumed : 0}`;
+
+                // Network update
+                if (localPlayer) {
+                    networkWorker.postMessage({
+                        type: 'updateState',
+                        data: {
+                            x: localPlayer.x,
+                            y: localPlayer.y,
+                            size: localPlayer.size,
+                            consumed: localPlayer.consumed,
+                            isMoving: localPlayer.isMoving,
+                            keys: {...playerState.keys}
+                        }
+                    });
+                }
+            }
+
             requestAnimationFrame(animate);
+        }
+
+        // Create Web Worker for network operations
+        const networkWorker = new Worker(URL.createObjectURL(new Blob([`
+            let lastBroadcast = 0;
+            const broadcastInterval = 50; // ms
+            let gameState = null;
+            let connections = new Map();
+            let debug = false;
+
+            function debugLog(...args) {
+                if (debug) {
+                    console.log('[NetworkWorker]', ...args);
+                }
+            }
+
+            self.onmessage = function(e) {
+                const { type, data } = e.data;
+                switch (type) {
+                    case 'init':
+                        debug = data.debug;
+                        debugLog('Worker initialized');
+                        break;
+                    case 'updateState':
+                        gameState = data;
+                        broadcastIfNeeded();
+                        break;
+                    case 'updateConnections':
+                        connections = new Map(data);
+                        break;
+                }
+            };
+
+            function broadcastIfNeeded() {
+                const now = performance.now();
+                if (now - lastBroadcast > broadcastInterval && gameState) {
+                    lastBroadcast = now;
+                    self.postMessage({
+                        type: 'broadcast',
+                        data: gameState
+                    });
+                }
+            }
+        `], { type: 'text/javascript' })));
+
+        // Initialize worker with debug setting
+        networkWorker.postMessage({
+            type: 'init',
+            data: { debug: networkState.debug }
+        });
+
+        // Handle messages from worker
+        networkWorker.onmessage = function(e) {
+            const { type, data } = e.data;
+            switch (type) {
+                case 'broadcast':
+                    broadcastGameState(data);
+                    break;
+            }
+        };
+
+        function broadcastGameState(state) {
+            if (!networkState.peer || networkState.connections.size === 0) return;
+
+            const message = {
+                type: 'update',
+                playerId: networkState.playerId,
+                state: {
+                    x: localPlayer.x,
+                    y: localPlayer.y,
+                    size: localPlayer.size,
+                    consumed: localPlayer.consumed,
+                    isMoving: localPlayer.isMoving
+                }
+            };
+
+            networkState.connections.forEach(conn => {
+                if (conn.open) {
+                    conn.send(message);
+                }
+            });
         }
 
         document.getElementById('join-button').addEventListener('click', () => {
@@ -519,7 +836,7 @@
 
         initParticles();
         initNetworking();
-        animate();
+        animate(performance.now());
     </script>
 </body>
 </html>
