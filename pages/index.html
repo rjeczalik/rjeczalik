@@ -30,26 +30,21 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // ASCII art configuration
-        const text = `
- ██▀███   ▄▄▄        █████▒▄▄▄       ██▓    ▓█████▄ ▓█████ ██▒   █▓
-▓██ ▒ ██▒▒████▄    ▓██   ▒▒████▄    ▓██▒    ▒██▀ ██▌▓█   ▀▓██░   █▒
-▓██ ░▄█ ▒▒██  ▀█▄  ▒████ ░▒██  ▀█▄  ▒██░    ░██   █▌▒███   ▓██  █▒░
-▒██▀▀█▄  ░██▄▄▄▄██ ░▓█▒  ░░██▄▄▄▄██ ▒██░    ░▓█▄   ▌▒▓█  ▄  ▒██ █░░
-░██▓ ▒██▒ ▓█   ▓██▒░▒█░    ▓█   ▓██▒░██████▒░▒████▓ ░▒████▒  ▒▀█░  
-░ ▒▓ ░▒▓░ ▒▒   ▓▒█░ ▒ ░    ▒▒   ▓▒█░░ ▒░▓  ░ ▒▒▓  ▒ ░░ ▒░ ░  ░ ▐░  
-  ░▒ ░ ▒░  ▒   ▒▒ ░ ░       ▒   ▒▒ ░░ ░ ▒  ░ ░ ▒  ▒  ░ ░  ░  ░ ░░  
-  ░░   ░   ░   ▒    ░ ░     ░   ▒     ░ ░    ░ ░  ░    ░       ░░  
-   ░           ░  ░             ░  ░    ░  ░   ░       ░  ░      ░  
-                                            ░               ░     
-`.split('\n');
+        // ASCII art configuration - simplified to match grid
+        const textPattern = [
+            "  ____     _    ___   _    _     ____  _______   __",
+            " |  _ \\   / \\  |  _| / \\  | |   |  _ \\| ____\\ \\ / /",
+            " | |_) | / _ \\ | |  / _ \\ | |   | | | |  _|  \\ V / ",
+            " |  _ < / ___ \\| | / ___ \\| |___| |_| | |___  | |  ",
+            " |_| \\_/_/   \\_\\_|/_/   \\_\\_____|____/|_____| |_|  "
+        ];
 
         // Sand grain particle class
         class Particle {
             constructor(x, y, isText) {
                 this.x = x;
                 this.y = y;
-                this.size = 2;
+                this.size = 4;  // Increased size for better visibility
                 this.isText = isText;
                 this.baseX = x;
                 this.baseY = y;
@@ -100,33 +95,38 @@
             // Clear existing particles
             particles.length = 0;
 
-            // Calculate text position
-            const textWidth = 800; // Approximate width of ASCII art
-            const textHeight = text.length * 20; // Approximate height of ASCII art
-            const startX = (canvas.width - textWidth) / 2;
-            const startY = (canvas.height - textHeight) / 2;
+            const spacing = 6;  // Grid spacing
+            const textScale = 4;  // Scale factor for text
+            const cols = Math.floor(canvas.width / spacing);
+            const rows = Math.floor(canvas.height / spacing);
 
-            // Create text particles
-            text.forEach((line, lineIndex) => {
-                for (let i = 0; i < line.length; i++) {
-                    if (line[i] !== ' ') {
-                        particles.push(new Particle(
-                            startX + i * 8,
-                            startY + lineIndex * 20,
-                            true
-                        ));
-                    }
+            // Calculate text position to center it
+            const textWidth = textPattern[0].length * spacing * textScale;
+            const textHeight = textPattern.length * spacing * textScale;
+            const startX = Math.floor((canvas.width - textWidth) / 2);
+            const startY = Math.floor((canvas.height - textHeight) / 2);
+
+            // Create grid of particles
+            for (let i = 0; i < rows; i++) {
+                for (let j = 0; j < cols; j++) {
+                    const x = j * spacing;
+                    const y = i * spacing;
+                    
+                    // Check if this position corresponds to a text character
+                    const textX = Math.floor((x - startX) / (spacing * textScale));
+                    const textY = Math.floor((y - startY) / (spacing * textScale));
+                    
+                    const isTextParticle = 
+                        textY >= 0 && 
+                        textY < textPattern.length && 
+                        textX >= 0 && 
+                        textX < textPattern[0].length && 
+                        textPattern[textY][textX] !== ' ' &&
+                        x >= startX && x < startX + textWidth &&
+                        y >= startY && y < startY + textHeight;
+
+                    particles.push(new Particle(x, y, isTextParticle));
                 }
-            });
-
-            // Add background particles
-            const backgroundParticles = 1000;
-            for (let i = 0; i < backgroundParticles; i++) {
-                particles.push(new Particle(
-                    Math.random() * canvas.width,
-                    Math.random() * canvas.height,
-                    false
-                ));
             }
         }
 
